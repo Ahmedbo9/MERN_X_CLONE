@@ -20,6 +20,12 @@ export const signup = async (req, res) => {
       return res.status(400).json({ message: "Email already exists" });
     }
 
+    if (password.length < 6) {
+      return res
+        .status(400)
+        .json({ message: "Password should be atleast 6 characters" });
+    }
+
     //hash password
     const salt = await bcrypt.genSalt(10);
     const hashedPassword = await bcrypt.hash(password, salt);
@@ -44,5 +50,45 @@ export const signup = async (req, res) => {
     res.status(500).json({ message: "Server Error" });
   }
 };
-export const login = (req, res) => {};
-export const logout = (req, res) => {};
+export const login = async (req, res) => {
+  try {
+    const { username, password } = req.body;
+    const user = await User.findOne({ username });
+    if (!user) {
+      return res.status(400).json({ message: "Invalid Credentials" });
+    }
+
+    const isPasswordValid = await bcrypt.compare(password, user.password || "");
+    if (!isPasswordValid) {
+      return res.status(400).json({ message: "Invalid Credentials" });
+    }
+
+    generateTokenAndSetCookie(user._id, res);
+    return res.status(200).json({ message: "Login successful", ...user._doc });
+  } catch (error) {
+    console.error(`Error: ${error.message}`);
+    res.status(500).json({ message: "Server Error" });
+  }
+};
+
+export const logout = async (req, res) => {
+  try {
+    res.cookie("token", "", { maxAge: 0 });
+    return res.status(200).json({ message: "Logout successful" });
+  } catch (error) {
+    res.status(500).json({ message: "Server Error" });
+    console.error(`Error: ${error.message}`);
+  }
+};
+
+//get current user details for client side
+export const checkAuth = async (req, res) => {
+  try {
+    const userId = req.user._id;
+    const user = await User.findById(userId).select("-password");
+    res.status(200).json({ ...user._doc });
+  } catch (error) {
+    console.error(`Error: ${error.message}`);
+    res.status(500).json({ message: "Server Error" });
+  }
+};
