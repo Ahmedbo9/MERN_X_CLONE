@@ -75,3 +75,37 @@ export const followUnfollowUser = async (req, res) => {
     res.status(200).json({ message: "User followed successfully" });
   }
 };
+
+export const getSuggestedUsers = async (req, res) => {
+  try {
+    const currentUserId = req.user._id;
+    const usersFollowedByCurrentUser = await User.findById(
+      currentUserId
+    ).select("following");
+    const users = await User.aggregate([
+      {
+        //exclude the users that the current user is already following and the current user
+        $match: {
+          $and: [
+            { _id: { $nin: usersFollowedByCurrentUser.following } },
+            { _id: { $ne: currentUserId } },
+          ],
+        },
+      },
+      {
+        $sample: { size: 10 },
+      },
+    ]);
+
+    users.forEach((user) => {
+      user.password = undefined;
+    });
+
+    res.status(200).json(users);
+  } catch (error) {
+    console.log("Error in getSuggestedUsers: ", error.message);
+    res
+      .status(500)
+      .json({ message: error, error: "Error in getSuggestedUsers" });
+  }
+};
